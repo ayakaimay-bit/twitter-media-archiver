@@ -1,9 +1,9 @@
 name: Twitter Media Archiver
 
 on:
-  schedule:
-    # Run at :00, :20, and :40 of each hour
-    - cron: '0,20,40 * * * *'
+  # Triggered by external cron service
+  repository_dispatch:
+    types: [run-archiver]
   
   # Allow manual triggering
   workflow_dispatch:
