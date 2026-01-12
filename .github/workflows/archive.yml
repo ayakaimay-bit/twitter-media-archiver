@@ -1,0 +1,65 @@
+name: Twitter Media Archiver
+
+on:
+  schedule:
+    # Run every 20 minutes
+    - cron: '*/20 * * * *'
+  
+  # Allow manual triggering
+  workflow_dispatch:
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30  # Safety limit
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version
+      
+      - name: Install Python dependencies
+        run: |
+          pip install twikit httpx[http2]
+      
+      - name: Create cookies file from secret
+        run: |
+          echo '${{ secrets.TWITTER_COOKIES }}' > simple_twitter_cookies.json
+      
+      - name: Download previous media (if exists)
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: twitter-media
+          path: downloaded_images/
+      
+      - name: Run archiver
+        run: python script.py
+      
+      - name: Upload downloaded media
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: twitter-media
+          path: downloaded_images/
+          retention-days: 90  # Keep for 90 days
+          compression-level: 6  # Balance speed vs size
+      
+      - name: Display stats
+        if: always()
+        run: |
+          echo "=== Archive Statistics ==="
+          ls -lh downloaded_images/ | tail -20
+          echo "Total files: $(ls -1 downloaded_images/ | wc -l)"
+          echo "Total size: $(du -sh downloaded_images/ | cut -f1)"
