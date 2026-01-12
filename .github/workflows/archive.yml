@@ -2,8 +2,8 @@ name: Twitter Media Archiver
 
 on:
   schedule:
-    # Run every 20 minutes
-    - cron: '*/20 * * * *'
+    # Run at :00, :20, and :40 of each hour
+    - cron: '0,20,40 * * * *'
   
   # Allow manual triggering
   workflow_dispatch:
