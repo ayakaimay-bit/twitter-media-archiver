@@ -11,7 +11,7 @@ on:
 jobs:
   archive:
     runs-on: ubuntu-latest
-    timeout-minutes: 30  # Safety limit
+    timeout-minutes: 30
     
     steps:
       - name: Checkout code
@@ -39,10 +39,13 @@ jobs:
       
       - name: Download previous media (if exists)
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: dawidd6/action-download-artifact@v3
         with:
           name: twitter-media
           path: downloaded_images/
+          workflow: archive.yml
+          workflow_conclusion: success
+          if_no_artifact_found: warn
       
       - name: Run archiver
         run: python script.py
@@ -53,8 +56,8 @@ jobs:
         with:
           name: twitter-media
           path: downloaded_images/
-          retention-days: 90  # Keep for 90 days
-          compression-level: 6  # Balance speed vs size
+          retention-days: 90
+          compression-level: 6
       
       - name: Display stats
         if: always()
