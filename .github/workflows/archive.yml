@@ -1,11 +1,8 @@
 name: Twitter Media Archiver
 
 on:
-  # Triggered by external cron service
   repository_dispatch:
     types: [run-archiver]
-  
-  # Allow manual triggering
   workflow_dispatch:
 
 jobs:
@@ -17,25 +14,45 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
+      - name: Cache Python packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      
+      - name: Cache APT packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            /var/cache/apt
+            /var/lib/apt
+          key: ${{ runner.os }}-apt-ffmpeg
+          restore-keys: |
+            ${{ runner.os }}-apt-
+      
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
       
-      - name: Install FFmpeg
+      - name: Install FFmpeg (cached)
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
           ffmpeg -version
       
-      - name: Install Python dependencies
+      - name: Install Python dependencies (cached)
         run: |
           pip install twikit httpx[http2]
       
       - name: Create cookies file from secret
         run: |
-          echo '${{ secrets.TWITTER_COOKIES }}' > simple_twitter_cookies.json
+          cat > simple_twitter_cookies.json << 'EOF'
+          ${{ secrets.TWITTER_COOKIES }}
+          EOF
       
       - name: Download previous media (if exists)
         continue-on-error: true
