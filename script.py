@@ -38,6 +38,21 @@ async def _patched_get_indices(self, home_page_response, session, headers):
 _tx_mod.ClientTransaction.get_indices = _patched_get_indices
 # END MONKEY PATCH
 
+# MONKEY PATCH 2: Fix KeyError 'urls' in User.__init__ for users with no description URLs
+from twikit import user as _user_mod
+_original_user_init = _user_mod.User.__init__
+
+def _patched_user_init(self, client, data):
+    if 'legacy' in data:
+        legacy = data['legacy']
+        if 'entities' in legacy and 'description' in legacy['entities']:
+            if 'urls' not in legacy['entities']['description']:
+                legacy['entities']['description']['urls'] = []
+    _original_user_init(self, client, data)
+
+_user_mod.User.__init__ = _patched_user_init
+# END MONKEY PATCH 2
+
 # Check for ffmpeg
 FFMPEG_AVAILABLE = False
 try:
