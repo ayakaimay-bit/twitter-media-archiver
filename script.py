@@ -603,7 +603,7 @@ async def main():
     print("[*] Loading authentication cookies...")
     if not await load_and_validate_cookies(client):
         print("\n[!] Authentication failed. Exiting.")
-        return
+        sys.exit(1)
     
     try:
         # Resolve user
@@ -635,8 +635,7 @@ async def main():
         print(f"\n[!] Critical error: {e}")
         import traceback
         traceback.print_exc()
-        return
-
+        sys.exit(1)
 
 if __name__ == "__main__":
     try:
