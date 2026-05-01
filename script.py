@@ -38,16 +38,20 @@ async def _patched_get_indices(self, home_page_response, session, headers):
 _tx_mod.ClientTransaction.get_indices = _patched_get_indices
 # END MONKEY PATCH
 
-# MONKEY PATCH 2: Fix KeyError 'urls' in User.__init__ for users with no description URLs
+# MONKEY PATCH 2: Fix KeyError in User.__init__ for missing optional fields
 from twikit import user as _user_mod
 _original_user_init = _user_mod.User.__init__
 
 def _patched_user_init(self, client, data):
     if 'legacy' in data:
         legacy = data['legacy']
+        # Ensure description urls exists
         if 'entities' in legacy and 'description' in legacy['entities']:
-            if 'urls' not in legacy['entities']['description']:
-                legacy['entities']['description']['urls'] = []
+            legacy['entities']['description'].setdefault('urls', [])
+        # Ensure other commonly missing fields have defaults
+        legacy.setdefault('withheld_in_countries', [])
+        legacy.setdefault('pinned_tweet_ids_str', [])
+        legacy.setdefault('profile_interstitial_type', '')
     _original_user_init(self, client, data)
 
 _user_mod.User.__init__ = _patched_user_init
