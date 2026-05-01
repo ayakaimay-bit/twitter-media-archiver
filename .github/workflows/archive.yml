@@ -65,11 +65,11 @@ jobs:
           if_no_artifact_found: warn
       
       - name: Run archiver
-        id: archiver  # ← Add this ID
+        id: archiver
         run: python script.py
       
       - name: Upload downloaded media
-        if: steps.archiver.outcome == 'success'  # ← Only upload on success
+        if: steps.archiver.outcome == 'success'  # Only upload if script succeeded
         uses: actions/upload-artifact@v4
         with:
           name: twitter-media
