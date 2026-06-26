@@ -80,7 +80,7 @@ except ImportError:
        sys.exit(1)  # Exit immediately - don't ask for input
 
 # --- CONFIGURATION ---
-TARGET_USERNAME = 'X87654321wy'
+TARGET_USERNAME = 'oioiqaqzgr'
 COOKIES_FILE = 'simple_twitter_cookies.json'
 RAW_COOKIES_FILE = 'twitter_cookies.json'
 SAVE_DIR = 'downloaded_images'
