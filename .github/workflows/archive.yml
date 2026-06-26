@@ -9,11 +9,11 @@ jobs:
   archive:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Cache Python packages
         uses: actions/cache@v4
         with:
@@ -21,7 +21,7 @@ jobs:
           key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
-      
+
       - name: Cache APT packages
         uses: actions/cache@v4
         with:
@@ -31,56 +31,95 @@ jobs:
           key: ${{ runner.os }}-apt-ffmpeg
           restore-keys: |
             ${{ runner.os }}-apt-
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
-      
+
       - name: Install FFmpeg (cached)
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
           ffmpeg -version
-      
+
       - name: Install Python dependencies (cached)
         run: |
           pip install twikit httpx[http2]
-      
+
       - name: Create cookies file from secret
         run: |
           cat > simple_twitter_cookies.json << 'EOF'
           ${{ secrets.TWITTER_COOKIES }}
           EOF
-      
-      - name: Download previous media (if exists)
+
+      - name: Download previous archive (if exists)
+        # continue-on-error so a missing or expired artifact never blocks the run
         continue-on-error: true
         uses: dawidd6/action-download-artifact@v3
         with:
           name: twitter-media
           path: downloaded_images/
           workflow: archive.yml
-          workflow_conclusion: success
+          # Do NOT filter by workflow_conclusion. The upload step runs on
+          # every run (success or failure), so the most recent artifact is
+          # always the most complete snapshot. Filtering to 'success' would
+          # silently roll back to an older snapshot whenever any run fails,
+          # losing any files downloaded before the crash.
           if_no_artifact_found: warn
-      
+
       - name: Run archiver
         id: archiver
-        run: python script.py
-      
-      - name: Upload downloaded media
-        if: steps.archiver.outcome == 'success'  # Only upload if script succeeded
+        # Capture exit code without failing the job immediately; the upload
+        # step below must always run so the archive is never lost.
+        # Exit 0 → success or soft failure (handle changed, no new content).
+        # Exit 1 → hard failure (auth error, unexpected crash).
+        run: |
+          python script.py
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+        # Do NOT add 'continue-on-error: true' here – let the natural exit
+        # code flow through so the job status reflects real failures.
+
+      - name: Upload archive
+        # Always upload – even when the script exits non-zero – so the
+        # artifact is never detached from the run due to a transient error
+        # or a handle change.
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: twitter-media
           path: downloaded_images/
           retention-days: 90
           compression-level: 6
-      
+          # Warn instead of error when the directory is empty (e.g. very
+          # first run with no cookies yet).
+          if-no-files-found: warn
+
       - name: Display stats
+        # Also runs always so you get a summary even on failure
         if: always()
         run: |
           echo "=== Archive Statistics ==="
-          ls -lh downloaded_images/ | tail -20
-          echo "Total files: $(ls -1 downloaded_images/ | wc -l)"
-          echo "Total size: $(du -sh downloaded_images/ | cut -f1)"
+          if [ -d downloaded_images ] && [ "$(ls -A downloaded_images 2>/dev/null)" ]; then
+            ls -lh downloaded_images/ | tail -20
+            echo "Total files: $(ls -1 downloaded_images/ | wc -l)"
+            echo "Total size:  $(du -sh downloaded_images/ | cut -f1)"
+            # Surface any handle-change warning stored in the state file
+            STATE="downloaded_images/.archiver_state.json"
+            if [ -f "$STATE" ]; then
+              NEW_HANDLE=$(python3 -c "
+          import json, sys
+          s = json.load(open('$STATE'))
+          h = s.get('handle_changed_to')
+          if h: print(h)
+          " 2>/dev/null)
+              if [ -n "$NEW_HANDLE" ]; then
+                echo ""
+                echo "⚠️  HANDLE CHANGED: target has renamed to @${NEW_HANDLE}"
+                echo "⚠️  Update TARGET_USERNAME in script.py to resume new-media downloads."
+              fi
+            fi
+          else
+            echo "No archive directory or it is empty."
+          fi
